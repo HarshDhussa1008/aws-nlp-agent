@@ -1,0 +1,74 @@
+'''
+Deprecated: Using intent extractor only.
+'''
+
+import logging
+import os
+from typing import Dict
+import json
+from dotenv import load_dotenv
+
+load_dotenv(dotenv_path="../.env")
+logger = logging.getLogger(__name__)
+
+class QueryClassifier:
+    """Classify query complexity to route to appropriate extraction path"""
+    
+    def __init__(self, bedrock_client):
+        self.bedrock = bedrock_client
+        self.model_id = os.getenv('BEDROCK_MODEL_ID')
+    
+    CLASSIFICATION_PROMPT = """You are an AWS query classifier. Classify the user's query into one of these categories:
+
+SIMPLE: Single AWS service, single operation, clear intent
+- Examples: "list my EC2 instances", "show S3 buckets", "describe RDS databases", "show EC2 instances in us-east-1 that are stopped and tagged Environment=prod"
+
+COMPLEX: Single service but requires complex logic/aggregation
+- Examples: "show EC2 instances across ALL regions and group by type", "find unattached volumes and calculate wasted costs"
+
+MULTI_STEP: Requires multiple AWS operations in sequence
+- Examples: "find unused EBS volumes and create a deletion plan","migrate RDS from single-AZ to multi-AZ"
+
+AMBIGUOUS: Missing critical information or unclear intent
+- Examples: "show me the databases", "delete old stuff", "make it faster"
+
+IMPORTANT: Filters, regions, and tags do NOT make a query complex. 
+A query is only complex if it requires aggregation, cross-service logic, or multiple steps.
+
+User Query: {query}
+
+Respond in JSON format:
+{{
+    "category": "simple|complex|multi_step|ambiguous",
+    "reasoning": "brief explanation",
+    "confidence": 0.0-1.0,
+    "identified_service": "aws_service_name or null",
+    "requires_clarification": true/false
+}}"""
+
+    def classify(self, query: str) -> Dict:
+        """Classify query complexity"""
+        
+        prompt = self.CLASSIFICATION_PROMPT.format(query=query)
+        
+        response = self.bedrock.invoke_model(
+            modelId=self.model_id,
+            contentType="application/json",
+            accept="application/json",
+            body=json.dumps({
+                "anthropic_version": "bedrock-2023-05-31",
+                "max_tokens": 500,
+                "temperature": 0.0,  # Deterministic classification
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            })
+        )
+        
+        result = json.loads(response['body'].read())
+        classification = json.loads(result['content'][0]['text'])
+        
+        return classification
