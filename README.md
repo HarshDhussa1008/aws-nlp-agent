@@ -881,7 +881,8 @@ This project is licensed under the MIT License - see the [LICENSE](./LICENSE) fi
 ## 🌟 Screenshots
 
 ### Interactive Mode
-![AWS NLP Agent Interactive Mode](./docs/screenshots/interactive-mode.png)
+![AWS NLP Agent Intent Check](./docs/screenshots/intent-check.png)
+![AWS NLP Agent Interactive Mode](./docs/screenshots/query-response.png)
 
 ---
 
